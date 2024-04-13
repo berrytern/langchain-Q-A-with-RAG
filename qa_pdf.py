@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-PDF_FILE = os.getenv("OPENAI_API_KEY", "./python_performance_improve.pdf")
+PDF_FILE = os.getenv("PDF_FILE", "./python_performance_improve.pdf")
 QUESTION = os.getenv("QUESTION", "What kind of techniques should i use to improve python performance?")
 
 
@@ -22,24 +22,36 @@ def get_pdf_pages(path):
     return pages
 
 
-
-
 embeddings = OpenAIEmbeddings()
 
 faiss_index_file = 'faiss_index'
 
 # Check if the folder exists
-if not os.path.exists(faiss_index_file):
-    # load pdf file
-    pdf_pages = get_pdf_pages(PDF_FILE)
-    docs = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)\
-        .split_documents(pdf_pages)
-    print('Creating FAISS index')
-    db = FAISS.from_documents(docs, embeddings)
-    db.save_local(faiss_index_file)
-else:
-    print('Loading FAISS index')
-    db = FAISS.load_local(faiss_index_file, embeddings, allow_dangerous_deserialization=True)
+with open("last_loaded_pdf.txt", 'r+') as file:
+    content = file.read()
+    if content != PDF_FILE:
+        pdf_pages = get_pdf_pages(PDF_FILE)
+        docs = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)\
+            .split_documents(pdf_pages)
+        print('Creating FAISS index')
+        db = FAISS.from_documents(docs, embeddings)
+        db.save_local(faiss_index_file)
+        file.truncate(0)
+        file.seek(0)
+        file.write(PDF_FILE)
+    elif not os.path.exists(faiss_index_file):
+        pdf_pages = get_pdf_pages(PDF_FILE)
+        docs = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)\
+            .split_documents(pdf_pages)
+        print('Creating FAISS index')
+        db = FAISS.from_documents(docs, embeddings)
+        db.save_local(faiss_index_file)
+        file.truncate(0)
+        file.seek(0)
+        file.write(PDF_FILE)
+    else:
+        print('Loading FAISS index')
+        db = FAISS.load_local(faiss_index_file, embeddings, allow_dangerous_deserialization=True)
 retriever = db.as_retriever()
 
 model = ChatOpenAI()
